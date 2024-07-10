@@ -305,22 +305,22 @@ func evaluateHand(dice []int) string {
 		counts[die]++
 	}
 
-	if fullHouseValues, isFullHouse := getFullHouse(counts); isFullHouse {
-		return "Full House: " + strconv.Itoa(fullHouseValues[0]) + " over " + strconv.Itoa(fullHouseValues[1])
-	} else if fiveOfAKindValue, isFiveOfAKind := getFiveOfAKind(counts); isFiveOfAKind {
-		return "5 of a Kind: " + strconv.Itoa(fiveOfAKindValue)
-	} else if fourOfAKindValue, isFourOfAKind := getFourOfAKind(counts); isFourOfAKind {
-		return "4 of a Kind: " + strconv.Itoa(fourOfAKindValue)
-	} else if isStraight(dice) {
-		return "Straight: " + getStraightString(dice)
-	} else if threeOfAKindValue, isThreeOfAKind := getThreeOfAKind(counts); isThreeOfAKind {
-		return "3 of a Kind: " + strconv.Itoa(threeOfAKindValue)
-	} else if pairValues, isTwoPair := getTwoPair(counts); isTwoPair {
-		return "2 Pair: " + strconv.Itoa(pairValues[0]) + " and " + strconv.Itoa(pairValues[1])
-	} else if pairValue, isOnePair := getOnePair(counts); isOnePair {
-		return "1 Pair: " + strconv.Itoa(pairValue)
-	} else {
-		return "No Pair"
+    if fullHouseValues, isFullHouse := getFullHouse(counts); isFullHouse {
+        return "fh" + strconv.Itoa(fullHouseValues[0]) + strconv.Itoa(fullHouseValues[1]) + "s"
+    } else if fiveOfAKindValue, isFiveOfAKind := getFiveOfAKind(counts); isFiveOfAKind {
+        return "5oak " + strconv.Itoa(fiveOfAKindValue) + "s"
+    } else if fourOfAKindValue, isFourOfAKind := getFourOfAKind(counts); isFourOfAKind {
+        return "q" + strconv.Itoa(fourOfAKindValue)
+    } else if isStraight(dice) {
+        return "straight " + getStraightString(dice)
+    } else if threeOfAKindValue, isThreeOfAKind := getThreeOfAKind(counts); isThreeOfAKind {
+        return "t" + strconv.Itoa(threeOfAKindValue)
+    } else if pairValues, isTwoPair := getTwoPair(counts); isTwoPair {
+        return strconv.Itoa(pairValues[0]) + strconv.Itoa(pairValues[1]) + "s"
+    } else if pairValue, isOnePair := getOnePair(counts); isOnePair {
+        return strconv.Itoa(pairValue) + "s"
+    } else {
+        return "nothing gg"
 	}
 }
 
@@ -346,19 +346,26 @@ func getFourOfAKind(counts map[int]int) (int, bool) {
 
 // Get the values for a full house
 func getFullHouse(counts map[int]int) ([2]int, bool) {
-	var threeValue, twoValue int
-	for value, count := range counts {
-		if count == 3 {
-			threeValue = value
-		} else if count == 2 {
-			twoValue = value
-		}
-	}
-	if threeValue != 0 && twoValue != 0 {
-		return [2]int{threeValue, twoValue}, true
-	}
-	return [2]int{}, false
+    var threeValue, twoValue int
+    values := make([]int, 0, len(counts))
+
+    for value, count := range counts {
+        if count == 3 {
+            threeValue = value
+        } else if count == 2 {
+            twoValue = value
+        }
+        values = append(values, value)
+    }
+
+    if threeValue != 0 && twoValue != 0 {
+        // Sort the values in descending order
+        sort.Sort(sort.Reverse(sort.IntSlice(values)))
+        return [2]int{threeValue, twoValue}, true
+    }
+    return [2]int{}, false
 }
+
 
 // Check if the dice form a straight
 func isStraight(dice []int) bool {
@@ -395,16 +402,17 @@ func getThreeOfAKind(counts map[int]int) (int, bool) {
 
 // Get the values if there are two pairs
 func getTwoPair(counts map[int]int) ([]int, bool) {
-	pairs := []int{}
-	for value, count := range counts {
-		if count == 2 {
-			pairs = append(pairs, value)
-		}
-	}
-	if len(pairs) == 2 {
-		return pairs, true
-	}
-	return nil, false
+    var pairs []int
+    for value, count := range counts {
+        if count == 2 {
+            pairs = append(pairs, value)
+        }
+    }
+    if len(pairs) != 2 {
+        return nil, false
+    }
+    sort.Sort(sort.Reverse(sort.IntSlice(pairs)))
+    return pairs, true
 }
 
 // Get the value if there is one pair
