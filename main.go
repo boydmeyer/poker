@@ -19,7 +19,7 @@ var ext = g.NewExt(g.ExtInfo{
 	Title:       "Poker",
 	Description: "An extension for managing, rolling, and resetting dice with automated poker hand evaluation and game interaction.",
 	Author:      "Nanobyte",
-	Version:     "1.0",
+	Version:     "1.1",
 })
 
 // Dice struct represents a dice with its ID, value, and packets for throwing and turning off
@@ -154,18 +154,14 @@ func handleThrowDice(e *g.Intercept) {
 // Handle the turning off of a dice
 func handleDiceOff(e *g.Intercept) {
 	packet := e.Packet
-	rawString := string(packet.Data)
-	logrus.WithFields(logrus.Fields{"raw_data": rawString}).Debug("Raw packet data")
+	diceIDStr := string(packet.Data)
 
-	diceValueStrings := strings.Fields(rawString)
-	if len(diceValueStrings) < 2 {
-		return
-	}
-
-	diceIDStr := diceValueStrings[0]
 	diceID, err := strconv.Atoi(diceIDStr)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{"dice_id_str": diceIDStr, "error": err}).Warn("Failed to parse dice ID")
+		logrus.WithFields(logrus.Fields{
+			"dice_id_str": diceIDStr,
+			"error":       err,
+		}).Warn("Failed to parse dice ID")
 		return
 	}
 
@@ -174,11 +170,12 @@ func handleDiceOff(e *g.Intercept) {
 
 	var dice *Dice
 	for _, d := range diceArray {
-		if d != nil && d.DiceID == diceID {
-			dice = d
-			if dice.DiceOff == nil {
-				dice.DiceOff = packet.Copy()
+		if d.DiceID == diceID {
+			if d.DiceOff == nil {
+				d.DiceOff = packet.Copy()
 			}
+			log.Printf("Dice %d off added\n", diceID)
+			dice = d
 			break
 		}
 	}
@@ -192,6 +189,7 @@ func handleDiceOff(e *g.Intercept) {
 		log.Printf("Dice %d added\n", dice.DiceID)
 	}
 }
+
 
 // Handle the result of a dice roll
 func handleDiceResult(e *g.Intercept) {
@@ -218,20 +216,19 @@ func handleDiceResult(e *g.Intercept) {
 		return
 	}
 	diceRollValue := diceValue - (diceID * 38)
-	log.Printf("Dice %d rolled: %d\n", diceID, diceRollValue)
 
 	setupMutex.Lock()
 	for i, dice := range diceArray {
 		if dice.DiceID == diceID {
 			diceArray[i].Value = diceRollValue
+			if rolling {
+				log.Printf("Dice %d rolled: %d\n", diceID, diceRollValue)
+				resultsWaitGroup.Done()
+			}
 			break
 		}
 	}
 	setupMutex.Unlock()
-
-	if rolling {
-		resultsWaitGroup.Done()
-	}
 }
 
 // Close the dice and send the packets to the game server
@@ -241,8 +238,8 @@ func closeDice() {
 	closing = true
 	for _, dice := range diceArray {
 		if dice.DiceOff != nil {
-			ext.SendPacket(dice.ThrowDice)
-			time.Sleep(1000 * time.Millisecond)
+			ext.SendPacket(dice.DiceOff)
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 	time.Sleep(1500 * time.Millisecond)
@@ -278,7 +275,7 @@ func rollDice() {
 	for _, dice := range diceArray {
 		if dice.ThrowDice != nil {
 			ext.SendPacket(dice.ThrowDice)
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 
