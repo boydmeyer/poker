@@ -37,6 +37,7 @@ var (
 	closing		     bool
 	setupMutex       sync.Mutex
 	resultsWaitGroup sync.WaitGroup
+	delay 		     = 600 * time.Millisecond
 )
 
 // Entry point of the application
@@ -239,10 +240,9 @@ func closeDice() {
 	for _, dice := range diceArray {
 		if dice.DiceOff != nil {
 			ext.SendPacket(dice.DiceOff)
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(delay)
 		}
 	}
-	time.Sleep(1500 * time.Millisecond)
 	closing = false
 }
 
@@ -275,7 +275,7 @@ func rollDice() {
 	for _, dice := range diceArray {
 		if dice.ThrowDice != nil {
 			ext.SendPacket(dice.ThrowDice)
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(delay)
 		}
 	}
 
