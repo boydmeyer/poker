@@ -19,7 +19,7 @@ var ext = g.NewExt(g.ExtInfo{
 	Title:       "Poker",
 	Description: "An extension for managing, rolling, and resetting dice with automated poker hand evaluation and game interaction.",
 	Author:      "Nanobyte",
-	Version:     "1.1",
+	Version:     "1.2",
 })
 
 // Dice struct represents a dice with its ID, value, and packets for throwing and turning off
@@ -312,7 +312,7 @@ func evaluateHand(dice []int) string {
     } else if fourOfAKindValue, isFourOfAKind := getFourOfAKind(counts); isFourOfAKind {
         return "q" + strconv.Itoa(fourOfAKindValue)
     } else if isStraight(dice) {
-        return "straight " + getStraightString(dice)
+        return getStraightString(dice) + " str8" 
     } else if threeOfAKindValue, isThreeOfAKind := getThreeOfAKind(counts); isThreeOfAKind {
         return "t" + strconv.Itoa(threeOfAKindValue)
     } else if pairValues, isTwoPair := getTwoPair(counts); isTwoPair {
@@ -382,12 +382,14 @@ func isStraight(dice []int) bool {
 }
 
 // Get a string representation of the straight
-func getStraightString(dice []int) string {
-	strValues := []string{}
-	for _, value := range dice {
-		strValues = append(strValues, strconv.Itoa(value))
+func getStraightString(values []int) string {
+	for _, value := range values {
+		if value == 1 {
+			return "L"
+		}
 	}
-	return strings.Join(strValues, ", ")
+	
+	return "H"
 }
 
 // Get the value if there are three of a kind
