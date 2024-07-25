@@ -60,7 +60,7 @@ Poker is a powerful tool for managing, rolling, and resetting dice with automate
 
 - `:roll` - Rolls all the dice.
 - `:close` - Closes the dice.
-- `:reset` - Resets all saved dice packets.
+- `:reset` - Resets all saved dices.
 
 ## Contributing
 
