@@ -55,9 +55,6 @@ Poker is a powerful tool for managing, rolling, and resetting dice with automate
    To set up the dice just doubleclick all the dices. The program will save the dice in the order they were rolled. Once this is done, you can start using the available commands.
 
 3. **You're able to use commands now!**
-   ```bash
-   :roll
-   ```
 
 ### Chat Commands
 
