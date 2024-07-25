@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,137 +17,110 @@ import (
 var ext = g.NewExt(g.ExtInfo{
 	Title:       "Poker",
 	Description: "An extension for managing, rolling, and resetting dice with automated poker hand evaluation and game interaction.",
-	Author:      "Nanobyte",
-	Version:     "1.2",
+	Author:      "Nanobyte", // "Nanobyte, Eduard"
+	Version:     "1.3",
 })
 
-// Dice struct represents a dice with its ID, value, and packets for throwing and turning off
-type Dice struct {
-	DiceID    int
-	Value     int
-	ThrowDice *g.Packet
-	DiceOff   *g.Packet
-}
-
-// Variables to manage dice, rolling state, mutex for setup, and wait group for results
+// Global variables for dice management, rolling state, mutex, and wait group
 var (
-	diceArray        []*Dice
-	rolling          bool
-	closing		     bool
-	setupMutex       sync.Mutex
+	diceList         []*Dice
+	isPokerRolling   bool
+	isTriRolling     bool
+	isClosing        bool
+	ChatIsDisabled	 bool
+	mutex            sync.Mutex
 	resultsWaitGroup sync.WaitGroup
-	delay 		     = 600 * time.Millisecond
+	rollDelay        = 600 * time.Millisecond
 )
 
 // Entry point of the application
 func main() {
-	ext.Initialized(onInitialized)
-	ext.Connected(onConnected)
-	ext.Disconnected(onDisconnected)
-	ext.Intercept(out.CHAT, out.SHOUT, out.WHISPER).With(handleChat)
+	ext.Intercept(out.CHAT, out.SHOUT, out.WHISPER).With(onChatMessage)
 	ext.Intercept(out.THROW_DICE).With(handleThrowDice)
 	ext.Intercept(out.DICE_OFF).With(handleDiceOff)
 	ext.Intercept(in.DICE_VALUE).With(handleDiceResult)
 	ext.Run()
 }
 
-func onInitialized(e g.InitArgs) {
-	log.Println("Extension initialized")
+// onChatMessage processes chat commands to trigger dice actions
+func onChatMessage(e *g.Intercept) {
+    msg := e.Packet.ReadString()
+    
+    // Check if already rolling or closing
+    if isPokerRolling || isTriRolling || isClosing {
+        log.Println("Already rolling or closing...")
+        return
+    }
+
+    // Process commands based on the message prefix and suffix
+    if strings.HasPrefix(msg, ":") {
+        command := strings.TrimPrefix(msg, ":")
+        
+        switch {
+        case strings.HasSuffix(command, "roll"):
+			e.Block()
+			isPokerRolling = true
+			go rollPokerDice()
+        case strings.HasSuffix(command, "close"):
+			e.Block()
+			go closeAllDice()
+        case strings.HasSuffix(command, "reset"):
+			e.Block()
+			resetDiceState()
+        case strings.HasSuffix(command, "tri"):
+			e.Block()
+			isTriRolling = true
+			go rollTriDice()
+		case strings.HasSuffix(command, "chaton"):
+			e.Block()
+			ChatIsDisabled = false
+		case strings.HasSuffix(command, "chatoff"):
+			e.Block()
+			ChatIsDisabled = true
+        }
+    }
 }
 
-func onConnected(e g.ConnectArgs) {
-	log.Printf("Game connected (%s)\n", e.Host)
-}
-
-func onDisconnected() {
-	log.Println("Game disconnected")
-}
-
-// Handle chat messages to trigger dice actions
-func handleChat(e *g.Intercept) {
-	msg := e.Packet.ReadString()
-	if strings.Contains(msg, ":close") {
-		e.Block()
-		log.Println(msg)
-
-		if rolling  {
-			log.Println("Already rolling...")
-			return
-		}
-
-		if closing  {
-			log.Println("Already closing...")
-			return
-		}
-
-		go closeDice()
-	} else if strings.Contains(msg, ":reset") {
-		e.Block()
-		log.Println(msg)
-		resetPackets()
-	} else if strings.Contains(msg, ":roll") {
-		e.Block()
-		log.Println(msg)
-
-		if rolling {
-			log.Println("Already rolling...")
-			return
-		}
-
-		if closing  {
-			log.Println("Already closing...")
-			return
-		}
-
-		rolling = true
-		go rollDice()
-	}
-}
-
-// Reset the saved dice packets
-func resetPackets() {
-	// Remove unnecessary locking and unlocking of the mutex
-	diceArray = []*Dice{}
-	rolling = false
-	closing = false
-	log.Println("All saved packets reset")
+// Reset all saved dice states
+func resetDiceState() {
+    mutex.Lock()
+    resultsWaitGroup.Wait() // Wait for any ongoing dice operations to complete
+    diceList = nil
+    isPokerRolling, isTriRolling, isClosing = false, false, false
+    mutex.Unlock()
 }
 
 // Handle the throwing of a dice
 func handleThrowDice(e *g.Intercept) {
 	packet := e.Packet
-	rawString := string(packet.Data)
-	logrus.WithFields(logrus.Fields{"raw_data": rawString}).Debug("Raw packet data")
+	rawData := string(packet.Data)
+	logrus.WithFields(logrus.Fields{"raw_data": rawData}).Debug("Raw packet data")
 
-	diceValueStrings := strings.Fields(rawString)
-	diceIDStr := diceValueStrings[0]
+	diceData := strings.Fields(rawData)
+	diceIDStr := diceData[0]
 	diceID, err := strconv.Atoi(diceIDStr)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{"dice_id_str": diceIDStr, "error": err}).Warn("Failed to parse dice ID")
 		return
 	}
 
-	setupMutex.Lock()
-	defer setupMutex.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 
-	var dice *Dice
-	for _, d := range diceArray {
-		if d != nil && d.DiceID == diceID {
-			dice = d
-			if dice.ThrowDice == nil {
-				dice.ThrowDice = packet.Copy()
-			}
+	// Search for a dice with the given ID in the list
+	var existingDice *Dice
+	for _, dice := range diceList {
+		if dice != nil && dice.ID == diceID {
+			existingDice = dice
 			break
 		}
 	}
 
-	if dice == nil && len(diceArray) < 5 {
-		dice = &Dice{
-			DiceID:    diceID,
-			ThrowDice: packet.Copy(),
-		}
-		diceArray = append(diceArray, dice)
-		log.Printf("Dice %d added\n", dice.DiceID)
+	// If not found and the list has fewer than 5 dice, create and add a new one
+	if existingDice == nil && len(diceList) < 5 {
+		newDice := &Dice{ID: diceID}
+		diceList = append(diceList, newDice)
+		log.Printf("Dice %d added\n", diceID)
 	}
 }
 
@@ -166,263 +138,125 @@ func handleDiceOff(e *g.Intercept) {
 		return
 	}
 
-	setupMutex.Lock()
-	defer setupMutex.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 
-	var dice *Dice
-	for _, d := range diceArray {
-		if d.DiceID == diceID {
-			if d.DiceOff == nil {
-				d.DiceOff = packet.Copy()
-			}
-			log.Printf("Dice %d off added\n", diceID)
-			dice = d
+	// Search for a dice with the given ID in the list
+	var existingDice *Dice
+	for _, dice := range diceList {
+		if dice != nil && dice.ID == diceID {
+			existingDice = dice
 			break
 		}
 	}
 
-	if dice == nil && len(diceArray) < 5 {
-		dice = &Dice{
-			DiceID:  diceID,
-			DiceOff: packet.Copy(),
-		}
-		diceArray = append(diceArray, dice)
-		log.Printf("Dice %d added\n", dice.DiceID)
+	// If not found and the list has fewer than 5 dice, create and add a new one
+	if existingDice == nil && len(diceList) < 5 {
+		newDice := &Dice{ID: diceID}
+		diceList = append(diceList, newDice)
+		log.Printf("Dice %d added\n", diceID)
 	}
 }
-
 
 // Handle the result of a dice roll
 func handleDiceResult(e *g.Intercept) {
 	packet := e.Packet
-	rawString := string(packet.Data)
-	logrus.WithFields(logrus.Fields{"raw_data": rawString}).Debug("Raw packet data")
+	rawData := string(packet.Data)
+	logrus.WithFields(logrus.Fields{"raw_data": rawData}).Debug("Raw packet data")
 
-	diceValueStrings := strings.Fields(rawString)
-	if len(diceValueStrings) < 2 {
+	diceData := strings.Fields(rawData)
+	if len(diceData) < 2 {
 		return
 	}
 
-	diceIDStr := diceValueStrings[0]
+	diceIDStr := diceData[0]
 	diceID, err := strconv.Atoi(diceIDStr)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{"dice_id_str": diceIDStr, "error": err}).Warn("Failed to parse dice ID")
 		return
 	}
 
-	diceValueStr := diceValueStrings[1]
+	diceValueStr := diceData[1]
 	diceValue, err := strconv.Atoi(diceValueStr)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{"dice_value_str": diceValueStr, "error": err}).Warn("Failed to parse dice value")
 		return
 	}
-	diceRollValue := diceValue - (diceID * 38)
+	adjustedDiceValue := diceValue - (diceID * 38)
 
-	setupMutex.Lock()
-	for i, dice := range diceArray {
-		if dice.DiceID == diceID {
-			diceArray[i].Value = diceRollValue
-			if rolling {
-				log.Printf("Dice %d rolled: %d\n", diceID, diceRollValue)
+
+	mutex.Lock()
+	for i, dice := range diceList {
+		if dice.ID == diceID {
+			diceList[i].Value = adjustedDiceValue
+			diceList[i].IsRolling = false
+			diceList[i].IsClosed = diceList[i].Value == 0
+
+			if isPokerRolling || isTriRolling {
+				log.Printf("Dice %d rolled: %d\n", diceID, adjustedDiceValue)
 				resultsWaitGroup.Done()
 			}
 			break
 		}
 	}
-	setupMutex.Unlock()
+	mutex.Unlock()
 }
 
 // Close the dice and send the packets to the game server
-func closeDice() {
-	setupMutex.Lock()
-	setupMutex.Unlock()
-	closing = true
-	for _, dice := range diceArray {
-		if dice.DiceOff != nil {
-			ext.SendPacket(dice.DiceOff)
-			time.Sleep(delay)
-		}
+func closeAllDice() {
+	mutex.Lock()
+	mutex.Unlock()
+	isClosing = true
+	for _, dice := range diceList {
+		dice.Close()
+		time.Sleep(rollDelay)
 	}
-	closing = false
+	isClosing = false
 }
 
-// Roll the dice by sending packets and waiting for results
-func rollDice() {
-	setupMutex.Lock()
+// Roll the poker dice by sending packets and waiting for results
+func rollPokerDice() {
+	mutex.Lock()
 
-	if len(diceArray) < 5 {
-		setupMutex.Unlock()
+	if len(diceList) < 5 {
+		mutex.Unlock()
 		log.Println("Not enough dice to roll")
 		return
 	}
 
-	validDiceCount := 0
-	for _, dice := range diceArray {
-		if dice.ThrowDice != nil {
-			validDiceCount++
-		}
-	}
+	resultsWaitGroup.Add(len(diceList))
+	mutex.Unlock()
 
-	if validDiceCount == 0 {
-		setupMutex.Unlock()
-		log.Println("No valid dice to roll")
-		return
-	}
-
-	resultsWaitGroup.Add(validDiceCount)
-	setupMutex.Unlock()
-
-	for _, dice := range diceArray {
-		if dice.ThrowDice != nil {
-			ext.SendPacket(dice.ThrowDice)
-			time.Sleep(delay)
-		}
+	for _, dice := range diceList {
+		dice.Roll()
+		time.Sleep(rollDelay)
 	}
 
 	time.Sleep(1000 * time.Millisecond)
 	resultsWaitGroup.Wait()
-	waitForAllResults()
+	evaluatePokerHand()
 }
 
-// Wait for all dice results and evaluate the hand
-func waitForAllResults() {
-	rolling = false
-	hand := evaluateHand([]int{diceArray[0].Value, diceArray[1].Value, diceArray[2].Value, diceArray[3].Value, diceArray[4].Value})
-	log.Printf("Hand: %s\n", hand)
-	ext.Send(out.SHOUT, hand)
-}
+// Roll the tri dice by sending packets and waiting for results
+func rollTriDice() {
+	mutex.Lock()
 
-// Evaluate the hand of dice and return a string representation
-func evaluateHand(dice []int) string {
-	if len(dice) != 5 {
-		return "Invalid input"
+	if len(diceList) < 5 {
+		mutex.Unlock()
+		log.Println("Not enough dice to roll")
+		return
 	}
 
-	sort.Ints(dice)
-	counts := make(map[int]int)
+	resultsWaitGroup.Add(3)
+	mutex.Unlock()
 
-	for _, die := range dice {
-		counts[die]++
+	for _, index := range []int{0, 2, 4} {
+		diceList[index].Roll()
+		time.Sleep(rollDelay)
 	}
 
-    if fullHouseValues, isFullHouse := getFullHouse(counts); isFullHouse {
-        return "fh" + strconv.Itoa(fullHouseValues[0]) + strconv.Itoa(fullHouseValues[1]) + "s"
-    } else if fiveOfAKindValue, isFiveOfAKind := getFiveOfAKind(counts); isFiveOfAKind {
-        return "5oak " + strconv.Itoa(fiveOfAKindValue) + "s"
-    } else if fourOfAKindValue, isFourOfAKind := getFourOfAKind(counts); isFourOfAKind {
-        return "q" + strconv.Itoa(fourOfAKindValue)
-    } else if isStraight(dice) {
-        return getStraightString(dice) + " str8" 
-    } else if threeOfAKindValue, isThreeOfAKind := getThreeOfAKind(counts); isThreeOfAKind {
-        return "t" + strconv.Itoa(threeOfAKindValue)
-    } else if pairValues, isTwoPair := getTwoPair(counts); isTwoPair {
-        return strconv.Itoa(pairValues[0]) + strconv.Itoa(pairValues[1]) + "s"
-    } else if pairValue, isOnePair := getOnePair(counts); isOnePair {
-        return strconv.Itoa(pairValue) + "s"
-    } else {
-        return "nothing gg"
-	}
-}
+	time.Sleep(1000 * time.Millisecond)
+	resultsWaitGroup.Wait()
 
-// Get the value if there are five of a kind
-func getFiveOfAKind(counts map[int]int) (int, bool) {
-	for value, count := range counts {
-		if count == 5 {
-			return value, true
-		}
-	}
-	return 0, false
-}
-
-// Get the value if there are four of a kind
-func getFourOfAKind(counts map[int]int) (int, bool) {
-	for value, count := range counts {
-		if count == 4 {
-			return value, true
-		}
-	}
-	return 0, false
-}
-
-// Get the values for a full house
-func getFullHouse(counts map[int]int) ([2]int, bool) {
-    var threeValue, twoValue int
-    values := make([]int, 0, len(counts))
-
-    for value, count := range counts {
-        if count == 3 {
-            threeValue = value
-        } else if count == 2 {
-            twoValue = value
-        }
-        values = append(values, value)
-    }
-
-    if threeValue != 0 && twoValue != 0 {
-        // Sort the values in descending order
-        sort.Sort(sort.Reverse(sort.IntSlice(values)))
-        return [2]int{threeValue, twoValue}, true
-    }
-    return [2]int{}, false
-}
-
-
-// Check if the dice form a straight
-func isStraight(dice []int) bool {
-	if (dice[0] == 1 && dice[1] == 2 && dice[2] == 3 && dice[3] == 4 && dice[4] == 5) ||
-		(dice[0] == 2 && dice[1] == 3 && dice[2] == 4 && dice[3] == 5 && dice[4] == 6) {
-		return true
-	}
-	for i := 0; i < 4; i++ {
-		if dice[i+1] != dice[i]+1 {
-			return false
-		}
-	}
-	return true
-}
-
-// Get a string representation of the straight
-func getStraightString(values []int) string {
-	for _, value := range values {
-		if value == 1 {
-			return "L"
-		}
-	}
-	
-	return "H"
-}
-
-// Get the value if there are three of a kind
-func getThreeOfAKind(counts map[int]int) (int, bool) {
-	for value, count := range counts {
-		if count == 3 {
-			return value, true
-		}
-	}
-	return 0, false
-}
-
-// Get the values if there are two pairs
-func getTwoPair(counts map[int]int) ([]int, bool) {
-    var pairs []int
-    for value, count := range counts {
-        if count == 2 {
-            pairs = append(pairs, value)
-        }
-    }
-    if len(pairs) != 2 {
-        return nil, false
-    }
-    sort.Sort(sort.Reverse(sort.IntSlice(pairs)))
-    return pairs, true
-}
-
-// Get the value if there is one pair
-func getOnePair(counts map[int]int) (int, bool) {
-	for value, count := range counts {
-		if count == 2 {
-			return value, true
-		}
-	}
-	return 0, false
+	evaluateTriHand()
 }
