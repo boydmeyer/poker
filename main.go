@@ -19,8 +19,8 @@ import (
 var ext = g.NewExt(g.ExtInfo{
 	Title:       "Poker",
 	Description: "An extension for managing, rolling, and resetting dice with automated poker hand evaluation and game interaction.",
-	Author:      "Nanobyte",
-	Version:     "1.2",
+	Author:      "Nanobyte", // "Nanobyte, Eduard", //if allowed hihi
+	Version:     "1.3",
 })
 
 // Dice struct represents a dice with its ID, value, and packets for throwing and turning off
@@ -266,6 +266,7 @@ func waitForAllResults() {
 }
 
 // Evaluate the hand of dice and return a string representation
+// thank you b7 <3 (and me, eduard, selfplug lol)
 func toPokerString(dices []*Dice) string {
 	s := ""
 	for _, dice := range dices {
