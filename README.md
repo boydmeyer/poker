@@ -4,9 +4,10 @@ Poker is a powerful tool for managing, rolling, and resetting dice with automate
 
 ## Features
 
-- Manage multiple dice
-- Roll and reset dice
-- Automatically evaluate poker hands
+- Manage multiple dice: Handle operations involving multiple dice, including adding, removing, and tracking their states.
+- Roll and reset dice: Simulate rolling dice and resetting them to their initial state.
+- Automatically evaluate poker hands: Determine the value of poker hands based on the rolled dice.
+- Automatically evaluate tri sum: Calculate the sum of three dice and evaluate specific conditions or outcomes.
 
 ## Installation
 
@@ -52,18 +53,17 @@ Poker is a powerful tool for managing, rolling, and resetting dice with automate
 
 2. **Initialize Dice:**
 
-   To set up the dice, first roll them and then close them. The program will save the dice in the order they were rolled. Once this is done, you can start using the available commands.
+   To set up, simply doubleclick all the dices. The program will record the dice in the order they were rolled. After setup is complete, you can begin using the available commands.
 
-3. **You're able to use commands now!**
-   ```bash
-   :roll
-   ```
 
 ### Chat Commands
 
-- `:roll` - Rolls all the dice.
-- `:close` - Closes the dice.
-- `:reset` - Resets all saved dice packets.
+- `:roll` - Rolls all dice used in poker and announces the results of their values.
+- `:tri` - Rolls all dice used in the tri game and announces the total sum of the three dice.
+- `:close` - Closes all dices.
+- `:reset` - Clears any previously stored dice data for a fresh start.
+- `:chaton` - Enables announcing the results of the dice rolls
+- `:chatoff` - Disables announcing the results of the dice rolls
 
 ## Contributing
 
