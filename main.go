@@ -202,7 +202,13 @@ func handleDiceResult(e *g.Intercept) {
 // Close the dice and send the packets to the game server
 func closeDice() {
 	setupMutex.Lock()
-	setupMutex.Unlock()
+
+	if len(diceArray) < 5 {
+		setupMutex.Unlock()
+		rolling = false
+		log.Println("Not enough dice to close")
+		return
+	}
 	closing = true
 	for _, dice := range diceArray {
 		if dice != nil {
@@ -219,6 +225,7 @@ func rollDice() {
 
 	if len(diceArray) < 5 {
 		setupMutex.Unlock()
+		rolling = false
 		log.Println("Not enough dice to roll")
 		return
 	}
