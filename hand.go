@@ -86,13 +86,13 @@ func toPokerString(dices []*Dice) string {
 
 	switch c {
 	case "5":
-		return n + "F"
+		return "F" + n 
 	case "4":
-		return n + "q"
+		return "q" + n
 	case "3":
-		return n + "t"
+		return "t" + n
 	case "32":
-		return n + "fh"
+		return "fh" + n
 	case "22":
 		return n + "s"
 	case "2":
