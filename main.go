@@ -241,7 +241,7 @@ func rollPokerDice() {
 		dice.Roll()
 
 		// random delay between 550 and 600ms
-		time.Sleep(rollDelay + time.Duration(rand.Intn(50))*time.Millisecond)
+		time.Sleep(rollDelay + time.Duration(rand.Intn(100))*time.Millisecond)
 	}
 
 	time.Sleep(1000 * time.Millisecond)
