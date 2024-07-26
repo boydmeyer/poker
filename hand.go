@@ -13,7 +13,6 @@ import (
 
 // Wait for all dice results and evaluate the poker hand
 func evaluatePokerHand() {
-	isPokerRolling = false
 	if !ChatIsDisabled {
 		hand := toPokerString(diceList)
 		
@@ -21,11 +20,11 @@ func evaluatePokerHand() {
 		time.Sleep(time.Duration(rand.Intn(250)+250) * time.Millisecond)
 		ext.Send(out.SHOUT, hand)
 	}
+	isPokerRolling = false
 }
 
 // Wait for all dice results and evaluate the tri hand
 func evaluateTriHand() {
-	isTriRolling = false
 	if !ChatIsDisabled {
 		hand := sumHand([]int{
 			diceList[0].Value,
@@ -37,6 +36,7 @@ func evaluateTriHand() {
 		time.Sleep(time.Duration(rand.Intn(250)+250) * time.Millisecond)
 		ext.Send(out.SHOUT, hand)
 	}
+	isTriRolling = false
 }
 
 // Sum the values of the dice and return a string representation
