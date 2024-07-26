@@ -208,16 +208,17 @@ func handleDiceResult(e *g.Intercept) {
 // Close the dice and send the packets to the game server
 func closeAllDice() {
 	mutex.Lock()
-	defer mutex.Unlock()
 	isClosing = true
-	resultsWaitGroup.Add(len(diceList))
+	mutex.Unlock()
+
 	for _, dice := range diceList {
 		dice.Close()
 		time.Sleep(rollDelay)
-		resultsWaitGroup.Done()
 	}
-	resultsWaitGroup.Wait()
+	
+	mutex.Lock()
 	isClosing = false
+	mutex.Unlock()
 }
 
 // Roll the poker dice by sending packets and waiting for results
