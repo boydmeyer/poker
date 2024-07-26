@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"xabbo.b7c.io/goearth/shockwave/out"
 )
@@ -14,6 +16,9 @@ func evaluatePokerHand() {
 	isPokerRolling = false
 	if !ChatIsDisabled {
 		hand := toPokerString(diceList)
+		
+		// sleep random between 250 and 500ms
+		time.Sleep(time.Duration(rand.Intn(250)+250) * time.Millisecond)
 		ext.Send(out.SHOUT, hand)
 	}
 }
@@ -27,6 +32,9 @@ func evaluateTriHand() {
 			diceList[2].Value,
 			diceList[4].Value,
 		})
+		
+		// sleep random between 250 and 500ms
+		time.Sleep(time.Duration(rand.Intn(250)+250) * time.Millisecond)
 		ext.Send(out.SHOUT, hand)
 	}
 }

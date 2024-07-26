@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"math/rand"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,7 +31,7 @@ var (
 	ChatIsDisabled	 bool
 	mutex            sync.Mutex
 	resultsWaitGroup sync.WaitGroup
-	rollDelay        = 800 * time.Millisecond
+	rollDelay        = 550 * time.Millisecond
 )
 
 // Entry point of the application
@@ -213,9 +214,10 @@ func closeAllDice() {
 
 	for _, dice := range diceList {
 		dice.Close()
-		time.Sleep(rollDelay)
+
+		// random delay between 550 and 600ms
+		time.Sleep(rollDelay + time.Duration(rand.Intn(50))*time.Millisecond)
 	}
-	
 	mutex.Lock()
 	isClosing = false
 	mutex.Unlock()
@@ -237,7 +239,9 @@ func rollPokerDice() {
 
 	for _, dice := range diceList {
 		dice.Roll()
-		time.Sleep(rollDelay)
+
+		// random delay between 550 and 600ms
+		time.Sleep(rollDelay + time.Duration(rand.Intn(50))*time.Millisecond)
 	}
 
 	time.Sleep(1000 * time.Millisecond)
@@ -262,7 +266,7 @@ func rollTriDice() {
 
 	for _, index := range []int{0, 2, 4} {
 		diceList[index].Roll()
-		time.Sleep(rollDelay)
+		time.Sleep(rollDelay + time.Duration(rand.Intn(100))*time.Millisecond)
 	}
 
 	time.Sleep(1000 * time.Millisecond)
